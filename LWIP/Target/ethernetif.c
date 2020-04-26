@@ -496,31 +496,31 @@ static struct pbuf * low_level_input(struct netif *netif)
  *
  * @param netif the lwip network interface structure for this ethernetif
  */
-void ethernetif_input(void* argument)
-{
-  struct pbuf *p;
-  struct netif *netif = (struct netif *) argument;
-  
-  for( ;; )
-  {
-    if (osSemaphoreAcquire(s_xSemaphore, TIME_WAITING_FOR_INPUT) == osOK)
-    {
-      do
-      {   
-        LOCK_TCPIP_CORE();
-        p = low_level_input( netif );
-        if   (p != NULL)
-        {
-          if (netif->input( p, netif) != ERR_OK )
-          {
-            pbuf_free(p);
-          }
-        }
-        UNLOCK_TCPIP_CORE();
-      } while(p!=NULL);
-    }
-  }
-}
+//void ethernetif_input(void* argument)
+//{
+//  struct pbuf *p;
+//  struct netif *netif = (struct netif *) argument;
+//
+//  for( ;; )
+//  {
+//    if (osSemaphoreAcquire(s_xSemaphore, TIME_WAITING_FOR_INPUT) == osOK)
+//    {
+//      do
+//      {
+//        LOCK_TCPIP_CORE();
+//        p = low_level_input( netif );
+//        if   (p != NULL)
+//        {
+//          if (netif->input( p, netif) != ERR_OK )
+//          {
+//            pbuf_free(p);
+//          }
+//        }
+//        UNLOCK_TCPIP_CORE();
+//      } while(p!=NULL);
+//    }
+//  }
+//}
 
 #if !LWIP_ARP
 /**
@@ -621,7 +621,33 @@ u32_t sys_now(void)
 /* USER CODE END 6 */
 
 /* USER CODE BEGIN 7 */
+void ethernetif_input(void* argument)
+{
+  struct pbuf *p;
+  struct netif *netif = (struct netif *) argument;
 
+  for( ;; )
+  {
+    if (osSemaphoreAcquire(s_xSemaphore, TIME_WAITING_FOR_INPUT) == osOK)
+    {
+      do
+      {
+        osDelay(25);
+        LOCK_TCPIP_CORE();
+        osDelay(1);
+        p = low_level_input( netif );
+        if   (p != NULL)
+        {
+          if (netif->input( p, netif) != ERR_OK )
+          {
+            pbuf_free(p);
+          }
+        }
+        UNLOCK_TCPIP_CORE();
+      } while(p!=NULL);
+    }
+  }
+}
 /* USER CODE END 7 */
 
 #if LWIP_NETIF_LINK_CALLBACK
