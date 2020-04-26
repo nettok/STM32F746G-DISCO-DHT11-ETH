@@ -25,7 +25,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "tcp_log_server.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -49,7 +49,7 @@ osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
   .priority = (osPriority_t) osPriorityNormal,
-  .stack_size = 128 * 4
+  .stack_size = 512 * 4
 };
 /* USER CODE BEGIN PV */
 
@@ -223,10 +223,19 @@ void StartDefaultTask(void *argument)
   /* init code for LWIP */
   MX_LWIP_Init();
   /* USER CODE BEGIN 5 */
+
+  tcp_log_server_init();
+
+  TcpLogMessage msg = {
+          .Buf = "Hola!\r\n",
+          .len = 7
+      };
+
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+    log_to_tcp(&msg);
+    osDelay(1000);
   }
   /* USER CODE END 5 */ 
 }
