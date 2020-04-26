@@ -178,7 +178,7 @@
 /* Section 2: PHY configuration section */
 
 /* LAN8742A_PHY_ADDRESS Address*/ 
-#define LAN8742A_PHY_ADDRESS           1
+#define LAN8742A_PHY_ADDRESS           0
 /* PHY Reset delay these values are based on a 1 ms Systick interrupt*/ 
 #define PHY_RESET_DELAY                 ((uint32_t)0x000000FFU)
 /* PHY Configuration delay */
@@ -214,7 +214,7 @@
 #define PHY_DUPLEX_STATUS               ((uint16_t)0x0010U)  /*!< PHY Duplex mask                                 */
 
 #define PHY_ISFR                        ((uint16_t)0x001DU)    /*!< PHY Interrupt Source Flag register Offset   */
-#define PHY_ISFR_INT4                   ((uint16_t)0x000BU)  /*!< PHY Link down inturrupt       */  
+#define PHY_ISFR_INT4                   ((uint16_t)0x0010U)  /*!< PHY Link down inturrupt       */  
 
 /* ################## SPI peripheral configuration ########################## */
 
