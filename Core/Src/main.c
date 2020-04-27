@@ -26,6 +26,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "tcp_log_server.h"
+#include "string.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -66,7 +67,16 @@ void StartDefaultTask(void *argument);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+void log_msg(char *msg)
+{
+  TcpLogMessage tcpLopMessage;
+  strncpy((char*)tcpLopMessage.Buf, msg, TCP_LOG_MESSAGE_BUFFER_LENGTH - 2);
+  tcpLopMessage.len = strlen((char*)tcpLopMessage.Buf);
+  tcpLopMessage.Buf[tcpLopMessage.len] = '\r';
+  tcpLopMessage.Buf[tcpLopMessage.len + 1] = '\n';
+  tcpLopMessage.len += 2;
+  log_to_tcp(&tcpLopMessage);
+}
 /* USER CODE END 0 */
 
 /**
@@ -226,17 +236,12 @@ void StartDefaultTask(void *argument)
 
   tcp_log_server_init();
 
-  TcpLogMessage msg = {
-          .Buf = "Hola!\r\n",
-          .len = 7
-      };
+  log_msg("STM32F746G-DISCO-DHT11-ETH: An Ethernet connected temperature and humidity sensor");
+  log_msg("Waiting for RTC setup by SNTP...");
 
-  /* Infinite loop */
-  for(;;)
-  {
-    log_to_tcp(&msg);
-    osDelay(1000);
-  }
+  // TODO: enable SNTP
+
+  osThreadExit();
   /* USER CODE END 5 */ 
 }
 

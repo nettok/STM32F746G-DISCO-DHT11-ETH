@@ -9,20 +9,20 @@
 #include "tcp_log_server.h"
 
 
-uint8_t tcpLogMessageStorageBuffer[TCP_LOG_MESSAGE_QUEUE_LENGTH * sizeof(TcpLogMessage)];
+static uint8_t tcpLogMessageStorageBuffer[TCP_LOG_MESSAGE_QUEUE_LENGTH * sizeof(TcpLogMessage)];
 
-StaticQueue_t tcpLogMessageStaticQueue;
+static StaticQueue_t tcpLogMessageStaticQueue;
 
-QueueHandle_t tcpLogMessageQueue;
+static QueueHandle_t tcpLogMessageQueue;
 
-osThreadId_t tcpLogServerTaskHandle;
-const osThreadAttr_t tcpLogServerTask_attributes = {
+static osThreadId_t tcpLogServerTaskHandle;
+static const osThreadAttr_t tcpLogServerTask_attributes = {
   .name = "tcpLogServerTask",
   .priority = (osPriority_t) osPriorityNormal,
   .stack_size = TCP_LOG_MESSAGE_SERVER_TREAD_STACK_SIZE * 4
 };
 
-uint8_t tcp_log_client_connected = 0;
+static uint8_t tcp_log_client_connected = 0;
 
 static void TcpLogServerTask(void *argument)
 {
@@ -84,7 +84,7 @@ void tcp_log_server_init()
 
 void log_to_tcp(TcpLogMessage *message)
 {
-  if (tcp_log_client_connected)
+  if (tcp_log_client_connected || uxQueueSpacesAvailable(tcpLogMessageQueue) > 0)
   {
     xQueueSend(tcpLogMessageQueue, message, 0);
   }
