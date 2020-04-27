@@ -89,3 +89,14 @@ void log_to_tcp(TcpLogMessage *message)
     xQueueSend(tcpLogMessageQueue, message, 0);
   }
 }
+
+void log_msg(char *msg)
+{
+  TcpLogMessage tcpLopMessage;
+  strncpy((char*)tcpLopMessage.Buf, msg, TCP_LOG_MESSAGE_BUFFER_LENGTH - 2);
+  tcpLopMessage.len = strlen((char*)tcpLopMessage.Buf);
+  tcpLopMessage.Buf[tcpLopMessage.len] = '\r';
+  tcpLopMessage.Buf[tcpLopMessage.len + 1] = '\n';
+  tcpLopMessage.len += 2;
+  log_to_tcp(&tcpLopMessage);
+}

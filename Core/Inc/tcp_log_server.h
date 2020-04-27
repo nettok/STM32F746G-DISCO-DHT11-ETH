@@ -12,6 +12,7 @@
 #include "lwip.h"
 #include "queue.h"
 #include "api.h"
+#include "string.h"
 
 #define TCP_LOG_MESSAGE_QUEUE_LENGTH 16
 #define TCP_LOG_MESSAGE_SERVER_TREAD_STACK_SIZE 512
@@ -25,5 +26,6 @@ typedef struct {
 
 void tcp_log_server_init();
 void log_to_tcp(TcpLogMessage *message);
+void log_msg(char *msg);
 
 #endif /* INC_TCP_LOG_SERVER_H_ */
