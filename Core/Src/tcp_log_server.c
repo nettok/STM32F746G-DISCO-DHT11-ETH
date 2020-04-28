@@ -57,7 +57,7 @@ static void TcpLogServerTask(void *argument)
             tcpLogMessageQueueReceiveStatus = xQueueReceive(tcpLogMessageQueue, &tcpLogMessage, 0);
             if (tcpLogMessageQueueReceiveStatus == pdPASS)
             {
-              write_err = netconn_write(newconn, tcpLogMessage.Buf, tcpLogMessage.len, NETCONN_NOCOPY);
+              write_err = netconn_write(newconn, tcpLogMessage.Buf, tcpLogMessage.len, NETCONN_COPY);
               if (write_err != ERR_OK)
               {
                 break;
