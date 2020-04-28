@@ -54,7 +54,7 @@ static void TcpLogServerTask(void *argument)
           // We will only accept one connection at a time
           while(1)
           {
-            tcpLogMessageQueueReceiveStatus = xQueueReceive(tcpLogMessageQueue, &tcpLogMessage, 0);
+            tcpLogMessageQueueReceiveStatus = xQueueReceive(tcpLogMessageQueue, &tcpLogMessage, portMAX_DELAY);
             if (tcpLogMessageQueueReceiveStatus == pdPASS)
             {
               write_err = netconn_write(newconn, tcpLogMessage.Buf, tcpLogMessage.len, NETCONN_COPY);
