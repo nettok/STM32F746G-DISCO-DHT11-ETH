@@ -13,7 +13,7 @@ static uint8_t tcpLogMessageStorageBuffer[TCP_LOG_MESSAGE_QUEUE_LENGTH * sizeof(
 
 static StaticQueue_t tcpLogMessageStaticQueue;
 
-static QueueHandle_t tcpLogMessageQueue;
+static QueueHandle_t tcpLogMessageQueue = NULL;
 
 static osThreadId_t tcpLogServerTaskHandle;
 static const osThreadAttr_t tcpLogServerTask_attributes = {
@@ -21,8 +21,6 @@ static const osThreadAttr_t tcpLogServerTask_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
   .stack_size = TCP_LOG_MESSAGE_SERVER_TREAD_STACK_SIZE * 4
 };
-
-static uint8_t tcp_log_client_connected = 0;
 
 static void TcpLogServerTask(void *argument)
 {
@@ -49,8 +47,6 @@ static void TcpLogServerTask(void *argument)
 
         if(accept_err == ERR_OK)
         {
-          tcp_log_client_connected = 1;
-
           // We will only accept one connection at a time
           while(1)
           {
@@ -65,7 +61,6 @@ static void TcpLogServerTask(void *argument)
             }
           }
 
-          tcp_log_client_connected = 0;
           netconn_delete(newconn);
         }
       }
@@ -84,7 +79,7 @@ void tcp_log_server_init()
 
 void tcp_log_message(TcpLogMessage *message)
 {
-  if (tcp_log_client_connected || uxQueueSpacesAvailable(tcpLogMessageQueue) > 0)
+  if (tcpLogMessageQueue != NULL && uxQueueSpacesAvailable(tcpLogMessageQueue) > 0)
   {
     xQueueSend(tcpLogMessageQueue, message, 0);
   }
