@@ -348,11 +348,11 @@ void InitializationTask(void *argument)
   /* USER CODE BEGIN 5 */
 
   tcp_log_server_init();
-  log_msg("STM32F746G-DISCO-DHT11-ETH: An Ethernet connected temperature and humidity sensor");
+  tcp_log_msg("STM32F746G-DISCO-DHT11-ETH: An Ethernet connected temperature and humidity sensor");
 
   sntp_rtc_bridge_init(hrtc);
   sntp_init();
-  log_msg("Waiting for RTC setup by SNTP...");
+  tcp_log_msg("Waiting for RTC setup by SNTP...");
 
   while (rtcDate.Year == 0)
   {
@@ -368,8 +368,8 @@ void InitializationTask(void *argument)
           2000 + rtcDate.Year, rtcDate.Month, rtcDate.Date,
           rtcTime.Hours, rtcTime.Minutes, rtcTime.Seconds);
 
-  log_msg(rtcDateTimeLogMessage);
-  log_msg("Enabling the RTC alarm which drives the execution of the main task...");
+  tcp_log_msg(rtcDateTimeLogMessage);
+  tcp_log_msg("Enabling the RTC alarm which drives the execution of the main task...");
 
   // The RTC alarm wakes up the main task to perform its job, and then the task
   // goes to sleep until the alarm triggers again.
@@ -393,7 +393,7 @@ void MainTask(void *argument)
   for(;;)
   {
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-    log_msg("Hola!");
+    tcp_log_msg("Hola!");
   }
   /* USER CODE END MainTask */
 }
