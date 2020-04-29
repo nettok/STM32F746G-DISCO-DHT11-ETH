@@ -27,6 +27,7 @@
 /* USER CODE BEGIN Includes */
 #include "sntp.h"
 #include "tcp_log_server.h"
+//#include "mqtt_event_publisher.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -369,10 +370,13 @@ void InitializationTask(void *argument)
           rtcTime.Hours, rtcTime.Minutes, rtcTime.Seconds);
 
   tcp_log_msg(rtcDateTimeLogMessage);
-  tcp_log_msg("Enabling the RTC alarm which drives the execution of the main task...");
+
+  // Initialize the MQTT publisher after SNTP has succeeded to make sure we have network communication
+//  mqtt_evt_pub_init();
 
   // The RTC alarm wakes up the main task to perform its job, and then the task
   // goes to sleep until the alarm triggers again.
+  tcp_log_msg("Enabling the RTC alarm which drives the execution of the main task...");
   rtcAlarmEnabled = 1;
 
   osThreadExit();
@@ -394,6 +398,7 @@ void MainTask(void *argument)
   {
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
     tcp_log_msg("Hola!");
+//    mqtt_evt_pub_publish("test/1", "Olafo");
   }
   /* USER CODE END MainTask */
 }

@@ -18,7 +18,7 @@ static QueueHandle_t tcpLogMessageQueue = NULL;
 static osThreadId_t tcpLogServerTaskHandle;
 static const osThreadAttr_t tcpLogServerTask_attributes = {
   .name = "tcpLogServerTask",
-  .priority = (osPriority_t) osPriorityNormal,
+  .priority = (osPriority_t) osPriorityLow,
   .stack_size = TCP_LOG_MESSAGE_SERVER_TREAD_STACK_SIZE * 4
 };
 
