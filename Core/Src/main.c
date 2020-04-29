@@ -27,6 +27,7 @@
 /* USER CODE BEGIN Includes */
 #include "sntp.h"
 #include "tcp_log_server.h"
+//#include "mqtt_event_publisher.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -47,11 +48,18 @@
 
 RTC_HandleTypeDef hrtc;
 
-/* Definitions for defaultTask */
-osThreadId_t defaultTaskHandle;
-const osThreadAttr_t defaultTask_attributes = {
-  .name = "defaultTask",
+/* Definitions for initTask */
+osThreadId_t initTaskHandle;
+const osThreadAttr_t initTask_attributes = {
+  .name = "initTask",
   .priority = (osPriority_t) osPriorityNormal,
+  .stack_size = 512 * 4
+};
+/* Definitions for mainTask */
+osThreadId_t mainTaskHandle;
+const osThreadAttr_t mainTask_attributes = {
+  .name = "mainTask",
+  .priority = (osPriority_t) osPriorityRealtime1,
   .stack_size = 512 * 4
 };
 /* USER CODE BEGIN PV */
@@ -62,7 +70,8 @@ const osThreadAttr_t defaultTask_attributes = {
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_RTC_Init(void);
-void StartDefaultTask(void *argument);
+void InitializationTask(void *argument);
+void MainTask(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -126,8 +135,11 @@ int main(void)
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* creation of defaultTask */
-  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+  /* creation of initTask */
+  initTaskHandle = osThreadNew(InitializationTask, NULL, &initTask_attributes);
+
+  /* creation of mainTask */
+  mainTaskHandle = osThreadNew(MainTask, NULL, &mainTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -218,6 +230,7 @@ static void MX_RTC_Init(void)
 
   RTC_TimeTypeDef sTime = {0};
   RTC_DateTypeDef sDate = {0};
+  RTC_AlarmTypeDef sAlarm = {0};
 
   /* USER CODE BEGIN RTC_Init 1 */
 
@@ -255,8 +268,24 @@ static void MX_RTC_Init(void)
   sDate.Month = RTC_MONTH_JANUARY;
   sDate.Date = 1;
   sDate.Year = 0;
-
   if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /** Enable the Alarm A 
+  */
+  sAlarm.AlarmTime.Hours = 0;
+  sAlarm.AlarmTime.Minutes = 0;
+  sAlarm.AlarmTime.Seconds = 0;
+  sAlarm.AlarmTime.SubSeconds = 0;
+  sAlarm.AlarmTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+  sAlarm.AlarmTime.StoreOperation = RTC_STOREOPERATION_RESET;
+  sAlarm.AlarmMask = RTC_ALARMMASK_ALL;
+  sAlarm.AlarmSubSecondMask = RTC_ALARMSUBSECONDMASK_ALL;
+  sAlarm.AlarmDateWeekDaySel = RTC_ALARMDATEWEEKDAYSEL_DATE;
+  sAlarm.AlarmDateWeekDay = 1;
+  sAlarm.Alarm = RTC_ALARM_A;
+  if (HAL_RTC_SetAlarm_IT(&hrtc, &sAlarm, RTC_FORMAT_BIN) != HAL_OK)
   {
     Error_Handler();
   }
@@ -283,53 +312,95 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+uint8_t rtcAlarmEnabled = 0;
+RTC_TimeTypeDef rtcTime = { 0 };
+RTC_DateTypeDef rtcDate = { 0 };
 
+void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc)
+{
+  // TODO: the alarm should be set to a 1 minute interval, currently it is set to 1 second for testing
+  if (!rtcAlarmEnabled)
+  {
+    return;
+  }
+
+  // Set current time in global variables
+  HAL_RTC_GetTime(hrtc, &rtcTime, RTC_FORMAT_BIN);
+  HAL_RTC_GetDate(hrtc, &rtcDate, RTC_FORMAT_BIN);
+
+  // wake up the main task each time the alarm triggers
+  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+  vTaskNotifyGiveFromISR((TaskHandle_t) mainTaskHandle, &xHigherPriorityTaskWoken);
+  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+}
 /* USER CODE END 4 */
 
-/* USER CODE BEGIN Header_StartDefaultTask */
+/* USER CODE BEGIN Header_InitializationTask */
 /**
-  * @brief  Function implementing the defaultTask thread.
+  * @brief  Function implementing the initTask thread.
   * @param  argument: Not used 
   * @retval None
   */
-/* USER CODE END Header_StartDefaultTask */
-void StartDefaultTask(void *argument)
+/* USER CODE END Header_InitializationTask */
+void InitializationTask(void *argument)
 {
   /* init code for LWIP */
   MX_LWIP_Init();
   /* USER CODE BEGIN 5 */
 
   tcp_log_server_init();
-  log_msg("STM32F746G-DISCO-DHT11-ETH: An Ethernet connected temperature and humidity sensor");
+  tcp_log_msg("STM32F746G-DISCO-DHT11-ETH: An Ethernet connected temperature and humidity sensor");
 
   sntp_rtc_bridge_init(hrtc);
   sntp_init();
-  log_msg("Waiting for RTC setup by SNTP...");
+  tcp_log_msg("Waiting for RTC setup by SNTP...");
 
-  RTC_TimeTypeDef time = { 0 };
-  RTC_DateTypeDef date = { 0 };
-
-  while (date.Year == 0)
+  while (rtcDate.Year == 0)
   {
-    HAL_RTC_GetTime(&hrtc, &time, RTC_FORMAT_BIN);
-    HAL_RTC_GetDate(&hrtc, &date, RTC_FORMAT_BIN);
+    HAL_RTC_GetTime(&hrtc, &rtcTime, RTC_FORMAT_BIN);
+    HAL_RTC_GetDate(&hrtc, &rtcDate, RTC_FORMAT_BIN);
     osDelay(1000);
   }
 
   char rtcDateTimeLogMessage[32];
 
   sprintf((char*) rtcDateTimeLogMessage,
-          "RTC set to %04d-%02d-%02dT%02d:%02d:%02dZ", 2000 + date.Year,
-          date.Month, date.Date, time.Hours, time.Minutes, time.Seconds);
+          "RTC set to %04d-%02d-%02dT%02d:%02d:%02dZ",
+          2000 + rtcDate.Year, rtcDate.Month, rtcDate.Date,
+          rtcTime.Hours, rtcTime.Minutes, rtcTime.Seconds);
 
-  log_msg(rtcDateTimeLogMessage);
-  log_msg("Starting temperature and humidity sensor reading task...");
+  tcp_log_msg(rtcDateTimeLogMessage);
 
-  // TODO: start temperature and humidity sensor reading task...
-  //       should use RTC alarm or OS timer as trigger?  Ideally should be synchronized with RTC.
+  // Initialize the MQTT publisher after SNTP has succeeded to make sure we have network communication
+//  mqtt_evt_pub_init();
+
+  // The RTC alarm wakes up the main task to perform its job, and then the task
+  // goes to sleep until the alarm triggers again.
+  tcp_log_msg("Enabling the RTC alarm which drives the execution of the main task...");
+  rtcAlarmEnabled = 1;
 
   osThreadExit();
   /* USER CODE END 5 */ 
+}
+
+/* USER CODE BEGIN Header_MainTask */
+/**
+* @brief Function implementing the mainTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_MainTask */
+void MainTask(void *argument)
+{
+  /* USER CODE BEGIN MainTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+    tcp_log_msg("Hola!");
+//    mqtt_evt_pub_publish("test/1", "Olafo");
+  }
+  /* USER CODE END MainTask */
 }
 
  /**

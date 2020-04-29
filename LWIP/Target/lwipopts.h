@@ -115,6 +115,7 @@
 /* USER CODE BEGIN 1 */
 #define SNTP_SERVER_DNS 1
 #define SNTP_SERVER_ADDRESS "pool.ntp.org"
+#define SNTP_STARTUP_DELAY 0
 
 #include "sntp_rtc_bridge.h"
 /* USER CODE END 1 */

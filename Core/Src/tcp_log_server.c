@@ -13,16 +13,14 @@ static uint8_t tcpLogMessageStorageBuffer[TCP_LOG_MESSAGE_QUEUE_LENGTH * sizeof(
 
 static StaticQueue_t tcpLogMessageStaticQueue;
 
-static QueueHandle_t tcpLogMessageQueue;
+static QueueHandle_t tcpLogMessageQueue = NULL;
 
 static osThreadId_t tcpLogServerTaskHandle;
 static const osThreadAttr_t tcpLogServerTask_attributes = {
   .name = "tcpLogServerTask",
-  .priority = (osPriority_t) osPriorityNormal,
+  .priority = (osPriority_t) osPriorityLow,
   .stack_size = TCP_LOG_MESSAGE_SERVER_TREAD_STACK_SIZE * 4
 };
-
-static uint8_t tcp_log_client_connected = 0;
 
 static void TcpLogServerTask(void *argument)
 {
@@ -49,15 +47,13 @@ static void TcpLogServerTask(void *argument)
 
         if(accept_err == ERR_OK)
         {
-          tcp_log_client_connected = 1;
-
           // We will only accept one connection at a time
           while(1)
           {
-            tcpLogMessageQueueReceiveStatus = xQueueReceive(tcpLogMessageQueue, &tcpLogMessage, 0);
+            tcpLogMessageQueueReceiveStatus = xQueueReceive(tcpLogMessageQueue, &tcpLogMessage, portMAX_DELAY);
             if (tcpLogMessageQueueReceiveStatus == pdPASS)
             {
-              write_err = netconn_write(newconn, tcpLogMessage.Buf, tcpLogMessage.len, NETCONN_COPY);
+              write_err = netconn_write(newconn, tcpLogMessage.message, tcpLogMessage.length, NETCONN_COPY);
               if (write_err != ERR_OK)
               {
                 break;
@@ -65,7 +61,6 @@ static void TcpLogServerTask(void *argument)
             }
           }
 
-          tcp_log_client_connected = 0;
           netconn_delete(newconn);
         }
       }
@@ -82,21 +77,21 @@ void tcp_log_server_init()
   }
 }
 
-void log_to_tcp(TcpLogMessage *message)
+void tcp_log_message(TcpLogMessage *message)
 {
-  if (tcp_log_client_connected || uxQueueSpacesAvailable(tcpLogMessageQueue) > 0)
+  if (tcpLogMessageQueue != NULL && uxQueueSpacesAvailable(tcpLogMessageQueue) > 0)
   {
     xQueueSend(tcpLogMessageQueue, message, 0);
   }
 }
 
-void log_msg(char *msg)
+void tcp_log_msg(char *msg)
 {
   TcpLogMessage tcpLopMessage;
-  strncpy((char*)tcpLopMessage.Buf, msg, TCP_LOG_MESSAGE_BUFFER_LENGTH - 2);
-  tcpLopMessage.len = strlen((char*)tcpLopMessage.Buf);
-  tcpLopMessage.Buf[tcpLopMessage.len] = '\r';
-  tcpLopMessage.Buf[tcpLopMessage.len + 1] = '\n';
-  tcpLopMessage.len += 2;
-  log_to_tcp(&tcpLopMessage);
+  strncpy(tcpLopMessage.message, msg, TCP_LOG_MESSAGE_BUFFER_LENGTH - 2);
+  tcpLopMessage.length = strlen(tcpLopMessage.message);
+  tcpLopMessage.message[tcpLopMessage.length] = '\r';
+  tcpLopMessage.message[tcpLopMessage.length + 1] = '\n';
+  tcpLopMessage.length += 2;
+  tcp_log_message(&tcpLopMessage);
 }
