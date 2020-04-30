@@ -399,6 +399,7 @@ void MainTask(void *argument)
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
     tcp_log_msg("Hola!");
     mqtt_evt_pub_publish("test/1", "Olafo");
+    osThreadYield();
   }
   /* USER CODE END MainTask */
 }

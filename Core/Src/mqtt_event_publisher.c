@@ -25,7 +25,7 @@ static void MqttEventPublisherTask(void *argument)
 {
   struct netconn *conn;
 
-  err_t err, conn_err, write_err;
+  err_t err, conn_err, mqtt_conn_err, mqtt_pub_err;
 
   MqttEvent event;
   BaseType_t eventQueueReceiveStatus;
@@ -43,15 +43,19 @@ static void MqttEventPublisherTask(void *argument)
         conn_err = netconn_connect(conn, &ip_addr, MQTT_EVENT_PUBLISHER_BROKER_PORT);
         if (conn_err == ERR_OK)
         {
-          while(1)
+          mqtt_conn_err = nx_mqtt_connect(conn, MQTT_EVENT_PUBLISHER_CLIENT_ID);
+          if (mqtt_conn_err == ERR_OK)
           {
-            eventQueueReceiveStatus = xQueueReceive(mqttEvtQueue, &event, portMAX_DELAY);
-            if (eventQueueReceiveStatus == pdPASS)
+            while(1)
             {
-              write_err = netconn_write(conn, event.payload, event.payload_length, NETCONN_COPY);
-              if (write_err != ERR_OK)
+              eventQueueReceiveStatus = xQueueReceive(mqttEvtQueue, &event, portMAX_DELAY);
+              if (eventQueueReceiveStatus == pdPASS)
               {
-                break;
+                mqtt_pub_err = nx_mqtt_publish(conn, event.topic, event.payload, event.payload_length);
+                if (mqtt_pub_err != ERR_OK)
+                {
+                  break;
+                }
               }
             }
           }
@@ -62,7 +66,6 @@ static void MqttEventPublisherTask(void *argument)
     osDelay(3000); // Try to reconnect after some time
   }
 }
-
 
 
 void mqtt_evt_pub_init()
