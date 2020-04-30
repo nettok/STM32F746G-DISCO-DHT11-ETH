@@ -51,6 +51,8 @@
 #define LWIP_DHCP 1
 /*----- Default Value for LWIP_DNS: 0 ---*/
 #define LWIP_DNS 1
+/*----- Default Value for LWIP_TCPIP_CORE_LOCKING: 0 ---*/
+#define LWIP_TCPIP_CORE_LOCKING 1
 /*----- Value in opt.h for MEM_ALIGNMENT: 1 -----*/
 #define MEM_ALIGNMENT 4
 /*----- Value in opt.h for LWIP_ETHERNET: LWIP_ARP || PPPOE_SUPPORT -*/
