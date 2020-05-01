@@ -9,14 +9,14 @@
 #include "dht11.h"
 
 
-static GPIO_InitTypeDef GPIO_DHT11_DATA_InitStruct = { 0 };
+static GPIO_InitTypeDef GPIO_DHT11_InitStruct = { 0 };
 
 static void setDHT11Mode(uint32_t mode) {
-  GPIO_DHT11_DATA_InitStruct.Pin = DHT11_DATA_Pin;
-  GPIO_DHT11_DATA_InitStruct.Mode = mode;
-  GPIO_DHT11_DATA_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_DHT11_DATA_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(DHT11_DATA_GPIO_Port, &GPIO_DHT11_DATA_InitStruct);
+  GPIO_DHT11_InitStruct.Pin = DHT11_Pin;
+  GPIO_DHT11_InitStruct.Mode = mode;
+  GPIO_DHT11_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_DHT11_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(DHT11_GPIO_Port, &GPIO_DHT11_InitStruct);
 }
 
 static void setDHT11ToOutputMode() {
@@ -28,11 +28,11 @@ static void setDHT11ToInputMode() {
 }
 
 static void setDHT11Pin(GPIO_PinState pinState) {
-  HAL_GPIO_WritePin(DHT11_DATA_GPIO_Port, DHT11_DATA_Pin, pinState);
+  HAL_GPIO_WritePin(DHT11_GPIO_Port, DHT11_Pin, pinState);
 }
 
 static GPIO_PinState getDHT11Pin() {
-  return HAL_GPIO_ReadPin(DHT11_DATA_GPIO_Port, DHT11_DATA_Pin);
+  return HAL_GPIO_ReadPin(DHT11_GPIO_Port, DHT11_Pin);
 }
 
 static uint32_t waitForDHT11PullUp() {
