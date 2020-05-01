@@ -16,7 +16,7 @@ static osThreadId_t mqttEvtPubTaskHandle;
 static const osThreadAttr_t mqttEvtPubTask_attributes = {
   .name = "mqttEvtPubTask",
   .priority = (osPriority_t) osPriorityNormal,
-  .stack_size = MQTT_EVENT_PUBLISHER_TREAD_STACK_SIZE * 4
+  .stack_size = MQTT_EVENT_PUBLISHER_THREAD_STACK_SIZE * 4
 };
 
 static ip4_addr_t ip_addr;
