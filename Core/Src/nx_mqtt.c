@@ -50,7 +50,7 @@ static size_t fillPublish(const char *topic, const void *payload, size_t payload
   size_t topic_length = strlen(topic);
 
   buffer[0] = 3 << 4;                   // fixed_header.control_packet_type
-  buffer[1] = 5 + topic_length          // fixed_header.remaining_length
+  buffer[1] = 3 + topic_length          // fixed_header.remaining_length
                 + payload_size;
 
   buffer[2] = 0;                        // topic_length_msb
@@ -60,11 +60,8 @@ static size_t fillPublish(const char *topic, const void *payload, size_t payload
 
   buffer[4 + topic_length] = 0;         // properties_length
 
-  buffer[5 + topic_length] = 0;         // payload_length_msb
-  buffer[6 + topic_length] = payload_size; // payload_length_lsb
-
-  memcpy(&buffer[7 + topic_length], payload, payload_size); // payload
-  return 7 + topic_length + payload_size;
+  memcpy(&buffer[5 + topic_length], payload, payload_size); // payload
+  return 5 + topic_length + payload_size;
 }
 
 err_t nx_mqtt_connect(struct netconn *conn, const char *client_id)
