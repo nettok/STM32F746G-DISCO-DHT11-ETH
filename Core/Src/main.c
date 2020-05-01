@@ -50,6 +50,8 @@
 RTC_HandleTypeDef hrtc;
 
 SD_HandleTypeDef hsd1;
+DMA_HandleTypeDef hdma_sdmmc1_rx;
+DMA_HandleTypeDef hdma_sdmmc1_tx;
 
 /* Definitions for initTask */
 osThreadId_t initTaskHandle;
@@ -72,6 +74,7 @@ const osThreadAttr_t mainTask_attributes = {
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_RTC_Init(void);
 static void MX_SDMMC1_SD_Init(void);
 void InitializationTask(void *argument);
@@ -114,6 +117,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_RTC_Init();
   MX_SDMMC1_SD_Init();
   MX_FATFS_Init();
@@ -324,6 +328,25 @@ static void MX_SDMMC1_SD_Init(void)
 
 }
 
+/** 
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void) 
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA2_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA2_Stream3_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream3_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream3_IRQn);
+  /* DMA2_Stream6_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream6_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream6_IRQn);
+
+}
+
 /**
   * @brief GPIO Initialization Function
   * @param None
@@ -344,7 +367,7 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin : GPIO_SD_DETECT_Pin */
   GPIO_InitStruct.Pin = GPIO_SD_DETECT_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(GPIO_SD_DETECT_GPIO_Port, &GPIO_InitStruct);
 
 }
@@ -370,6 +393,40 @@ void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc)
   BaseType_t xHigherPriorityTaskWoken = pdFALSE;
   vTaskNotifyGiveFromISR((TaskHandle_t) mainTaskHandle, &xHigherPriorityTaskWoken);
   portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+}
+
+
+FRESULT fRes; /* FatFs function common result code */
+FATFS SDFatFS; /* File system object for SD card logical drive */
+FIL MyFile; /* File object */
+char SDPath[4]; /* SD card logical drive path */
+char filename[15]; /* YYYYMMDDHH.CSV */
+uint8_t writeBuffer[50];
+UINT byteswritten; /* File write counts */
+
+void writeToMicroSD() {
+  fRes = f_mount(&SDFatFS, (TCHAR const*) SDPath, 0);
+  if (fRes != FR_OK) {
+    Error_Handler();
+  }
+
+  sprintf(filename, "%04d%02d%02d%02d.CSV", 2000 + rtcDate.Year, rtcDate.Month,
+          rtcDate.Date, rtcTime.Hours);
+
+  fRes = f_open(&MyFile, filename, FA_OPEN_APPEND | FA_WRITE);
+  if (fRes != FR_OK) {
+    Error_Handler();
+  }
+
+  int length = sprintf((char*) writeBuffer,
+                       "%04d-%02d-%02dT%02d:%02d:%02dZ\n", 2000 + rtcDate.Year,
+                       rtcDate.Month, rtcDate.Date, rtcTime.Hours, rtcTime.Minutes, rtcTime.Seconds);
+
+  f_write(&MyFile, writeBuffer, length, &byteswritten);
+
+  f_close(&MyFile);
+
+  f_mount(0, (TCHAR const*) SDPath, 0);
 }
 /* USER CODE END 4 */
 
@@ -437,6 +494,7 @@ void MainTask(void *argument)
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
     tcp_log_msg("Hola!");
     mqtt_evt_pub_publish("test/1", "Olafo");
+    writeToMicroSD();
     osThreadYield();
   }
   /* USER CODE END MainTask */
