@@ -29,6 +29,7 @@
 #include "sntp.h"
 #include "tcp_log_server.h"
 #include "mqtt_event_publisher.h"
+#include "microsd_io.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -389,44 +390,24 @@ void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc)
   HAL_RTC_GetTime(hrtc, &rtcTime, RTC_FORMAT_BIN);
   HAL_RTC_GetDate(hrtc, &rtcDate, RTC_FORMAT_BIN);
 
-  // wake up the main task each time the alarm triggers
+  // Wake up the main task each time the alarm triggers
   BaseType_t xHigherPriorityTaskWoken = pdFALSE;
   vTaskNotifyGiveFromISR((TaskHandle_t) mainTaskHandle, &xHigherPriorityTaskWoken);
   portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
-
-FRESULT fRes; /* FatFs function common result code */
-FATFS SDFatFS; /* File system object for SD card logical drive */
-FIL MyFile; /* File object */
-char SDPath[4]; /* SD card logical drive path */
-char filename[15]; /* YYYYMMDDHH.CSV */
-uint8_t writeBuffer[50];
-UINT byteswritten; /* File write counts */
-
 void writeToMicroSD() {
-  fRes = f_mount(&SDFatFS, (TCHAR const*) SDPath, 0);
-  if (fRes != FR_OK) {
-    Error_Handler();
-  }
+  char filename[15]; /* YYYYMMDDHH.CSV */
+  uint8_t writeBuffer[22];
 
   sprintf(filename, "%04d%02d%02d%02d.CSV", 2000 + rtcDate.Year, rtcDate.Month,
           rtcDate.Date, rtcTime.Hours);
-
-  fRes = f_open(&MyFile, filename, FA_OPEN_APPEND | FA_WRITE);
-  if (fRes != FR_OK) {
-    Error_Handler();
-  }
 
   int length = sprintf((char*) writeBuffer,
                        "%04d-%02d-%02dT%02d:%02d:%02dZ\n", 2000 + rtcDate.Year,
                        rtcDate.Month, rtcDate.Date, rtcTime.Hours, rtcTime.Minutes, rtcTime.Seconds);
 
-  f_write(&MyFile, writeBuffer, length, &byteswritten);
-
-  f_close(&MyFile);
-
-  f_mount(0, (TCHAR const*) SDPath, 0);
+  microsd_io_write(filename, writeBuffer, length);
 }
 /* USER CODE END 4 */
 
@@ -467,7 +448,11 @@ void InitializationTask(void *argument)
   tcp_log_msg(rtcDateTimeLogMessage);
 
   // Initialize the MQTT publisher after SNTP has succeeded to make sure we have network communication
+  tcp_log_msg("Starting the MQTT event publisher task...");
   mqtt_evt_pub_init();
+
+  tcp_log_msg("Starting the microSD I/O task...");
+  microsd_io_init();
 
   // The RTC alarm wakes up the main task to perform its job, and then the task
   // goes to sleep until the alarm triggers again.
