@@ -30,6 +30,7 @@
 #include "tcp_log_server.h"
 #include "mqtt_event_publisher.h"
 #include "microsd_io.h"
+#include "dht11.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -65,8 +66,8 @@ const osThreadAttr_t initTask_attributes = {
 osThreadId_t mainTaskHandle;
 const osThreadAttr_t mainTask_attributes = {
   .name = "mainTask",
-  .priority = (osPriority_t) osPriorityRealtime1,
-  .stack_size = 512 * 4
+  .priority = (osPriority_t) osPriorityAboveNormal,
+  .stack_size = 1024 * 4
 };
 /* USER CODE BEGIN PV */
 
@@ -363,13 +364,24 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOI_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
+  __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
-  /*Configure GPIO pin : GPIO_SD_DETECT_Pin */
-  GPIO_InitStruct.Pin = GPIO_SD_DETECT_Pin;
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(DHT11_GPIO_Port, DHT11_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : SD_DETECT_Pin */
+  GPIO_InitStruct.Pin = SD_DETECT_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-  HAL_GPIO_Init(GPIO_SD_DETECT_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(SD_DETECT_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : DHT11_Pin */
+  GPIO_InitStruct.Pin = DHT11_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(DHT11_GPIO_Port, &GPIO_InitStruct);
 
 }
 
@@ -380,7 +392,7 @@ RTC_DateTypeDef rtcDate = { 0 };
 
 void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc)
 {
-  // TODO: the alarm should be set to a 1 minute interval, currently it is set to 1 second for testing
+  // TODO: the alarm should be set to a 1 minute interval
   if (!rtcAlarmEnabled)
   {
     return;
@@ -390,24 +402,43 @@ void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc)
   HAL_RTC_GetTime(hrtc, &rtcTime, RTC_FORMAT_BIN);
   HAL_RTC_GetDate(hrtc, &rtcDate, RTC_FORMAT_BIN);
 
+  if (rtcTime.Seconds % 5 != 0)
+  {
+    // TODO: each 5 seconds for testing only
+    return;
+  }
+
   // Wake up the main task each time the alarm triggers
   BaseType_t xHigherPriorityTaskWoken = pdFALSE;
   vTaskNotifyGiveFromISR((TaskHandle_t) mainTaskHandle, &xHigherPriorityTaskWoken);
   portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
-void writeToMicroSD() {
+void send_climate_by_mqtt(Climate *climate, char *writeBuffer)
+{
+  sprintf(writeBuffer,
+          "%04d-%02d-%02dT%02d:%02d:%02dZ,%d.%d°C,%d.%d%%", 2000 + rtcDate.Year,
+          rtcDate.Month, rtcDate.Date, rtcTime.Hours, rtcTime.Minutes, rtcTime.Seconds,
+          climate->integralTemp, climate->decimalTemp,
+          climate->integralHumidity, climate->decimalHumidity);
+
+  mqtt_evt_pub_publish("climate", writeBuffer);
+}
+
+void write_climate_to_microsd(Climate *climate, char *writeBuffer)
+{
   char filename[15]; /* YYYYMMDDHH.CSV */
-  uint8_t writeBuffer[22];
 
   sprintf(filename, "%04d%02d%02d%02d.CSV", 2000 + rtcDate.Year, rtcDate.Month,
           rtcDate.Date, rtcTime.Hours);
 
-  int length = sprintf((char*) writeBuffer,
-                       "%04d-%02d-%02dT%02d:%02d:%02dZ\n", 2000 + rtcDate.Year,
-                       rtcDate.Month, rtcDate.Date, rtcTime.Hours, rtcTime.Minutes, rtcTime.Seconds);
+  int length = sprintf(writeBuffer,
+                       "%04d-%02d-%02dT%02d:%02d:%02dZ,%d.%d°C,%d.%d%%\n", 2000 + rtcDate.Year,
+                       rtcDate.Month, rtcDate.Date, rtcTime.Hours, rtcTime.Minutes, rtcTime.Seconds,
+                       climate->integralTemp, climate->decimalTemp,
+                       climate->integralHumidity, climate->decimalHumidity);
 
-  microsd_io_write(filename, writeBuffer, length);
+  microsd_io_write(filename, (uint8_t*)writeBuffer, length);
 }
 /* USER CODE END 4 */
 
@@ -473,13 +504,32 @@ void InitializationTask(void *argument)
 void MainTask(void *argument)
 {
   /* USER CODE BEGIN MainTask */
+  char writeBuffer[127];
+
+  Climate climate;
+
   /* Infinite loop */
   for(;;)
   {
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-    tcp_log_msg("Hola!");
-    mqtt_evt_pub_publish("test/1", "Olafo");
-    writeToMicroSD();
+
+    sprintf(writeBuffer,
+            "Reading climate at %04d-%02d-%02dT%02d:%02d:%02dZ...", 2000 + rtcDate.Year,
+            rtcDate.Month, rtcDate.Date, rtcTime.Hours, rtcTime.Minutes, rtcTime.Seconds);
+
+    tcp_log_msg(writeBuffer);
+
+    dht11_read_climate(&climate);
+
+    sprintf(writeBuffer, "Current climate: %d.%d°C,%d.%d%%",
+            climate.integralTemp, climate.decimalTemp,
+            climate.integralHumidity, climate.decimalHumidity);
+
+    tcp_log_msg(writeBuffer);
+
+    send_climate_by_mqtt(&climate, writeBuffer);
+    write_climate_to_microsd(&climate, writeBuffer);
+
     osThreadYield();
   }
   /* USER CODE END MainTask */
