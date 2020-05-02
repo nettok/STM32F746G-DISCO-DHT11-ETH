@@ -66,8 +66,8 @@ const osThreadAttr_t initTask_attributes = {
 osThreadId_t mainTaskHandle;
 const osThreadAttr_t mainTask_attributes = {
   .name = "mainTask",
-  .priority = (osPriority_t) osPriorityRealtime1,
-  .stack_size = 512 * 4
+  .priority = (osPriority_t) osPriorityAboveNormal,
+  .stack_size = 1024 * 4
 };
 /* USER CODE BEGIN PV */
 
